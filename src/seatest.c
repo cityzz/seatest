@@ -112,10 +112,51 @@ char* test_file_name(char* path)
 
 static int seatest_fixture_tests_run;
 static int seatest_fixture_tests_failed;
+static char* last_func_name = NULL;
+static int last_tests_failed = 0;
+static char outbuf[SEATEST_PRINT_BUFFER_SIZE];
 
 
-void seatest_simple_test_result_log(int passed, char* reason, const char* function, unsigned int line)
+void seatest_simple_test_result_log(int passed,
+                                    char* reason,
+                                    const char* function,
+                                    unsigned int line)
 {
+    if (last_func_name != NULL)
+    {
+        if (strcmp(function, last_func_name))
+        {
+            last_func_name = (char*) function;
+            if (last_tests_failed < sea_tests_failed)
+            {
+                // Have error in the last run
+                printf("%sfailed\n", outbuf);
+                if (seatest_current_fixture_path)
+                {
+                    sprintf(outbuf, "%s (%s) ... ", last_func_name, seatest_current_fixture_path);
+                }
+            }
+            else
+            {
+                printf("%sok\n", outbuf);
+                if (seatest_current_fixture_path)
+                {
+                    sprintf(outbuf, "%s (%s) ... ", last_func_name, seatest_current_fixture_path);
+                }
+            }
+            last_tests_failed = sea_tests_failed;
+        }
+    }
+    else
+    {
+        last_func_name = (char*) function;
+        last_tests_failed = sea_tests_failed;
+        if (seatest_current_fixture_path)
+        {
+            sprintf(outbuf, "%s (%s) ... ", last_func_name, seatest_current_fixture_path);
+        }
+    }
+
     if (!passed)
     {
 
@@ -285,18 +326,21 @@ void seatest_test_fixture_start(char* filepath)
 {
     seatest_current_fixture_path = filepath;
     seatest_current_fixture = test_file_name(filepath);
-    seatest_header_printer(seatest_current_fixture, seatest_screen_width, '-');
+    // seatest_header_printer(seatest_current_fixture, seatest_screen_width, '-');
+    printf("Running seatests\n");
     seatest_fixture_tests_failed = sea_tests_failed;
     seatest_fixture_tests_run = sea_tests_run;
+    // printf("run[%d], failed[%d], pass[%d]\n",seatest_fixture_tests_run,  seatest_fixture_tests_failed, sea_tests_passed);
     seatest_fixture_teardown = 0;
     seatest_fixture_setup = 0;
 }
 
-void seatest_test_fixture_end()
+void seatest_test_fixture_end( void )
 {
     char s[SEATEST_PRINT_BUFFER_SIZE];
-    sprintf(s, "%d run  %d failed", sea_tests_run-seatest_fixture_tests_run, sea_tests_failed-seatest_fixture_tests_failed);
-    seatest_header_printer(s, seatest_screen_width, ' ');
+    sprintf(s, "Ran %d tests, %d failed", sea_tests_run-seatest_fixture_tests_run, sea_tests_failed-seatest_fixture_tests_failed);
+    seatest_header_printer("", seatest_screen_width, '-');
+    printf("%s\n", s);
     printf("\r\n");
 }
 
@@ -348,30 +392,18 @@ int seatest_should_run( char* fixture, char* test)
 
 int run_tests(seatest_void_void tests)
 {
-    unsigned long end;
-    unsigned long start = GetTickCount();
     char version[40];
     char s[40];
     tests();
-    end = GetTickCount();
 
     if(seatest_is_display_only() || seatest_machine_readable) return SEATEST_RET_OK;
-    sprintf(version, "SEATEST v%s", SEATEST_VERSION);
-    printf("\r\n\r\n");
-    seatest_header_printer(version, seatest_screen_width, '=');
     printf("\r\n");
     if (sea_tests_failed > 0) {
-        seatest_header_printer("Failed", seatest_screen_width, ' ');
+        printf("Failed\n");
     }
     else {
-        seatest_header_printer("ALL TESTS PASSED", seatest_screen_width, ' ');
+        printf("ALL TESTS PASSED\n");
     }
-    sprintf(s,"%d tests run", sea_tests_run);
-    seatest_header_printer(s, seatest_screen_width, ' ');
-    sprintf(s,"in %lu ms",end - start);
-    seatest_header_printer(s, seatest_screen_width, ' ');
-    printf("\r\n");
-    seatest_header_printer("", seatest_screen_width, '=');
 
     return SEATEST_RET_FAILED_COUNT(sea_tests_failed);
 }
